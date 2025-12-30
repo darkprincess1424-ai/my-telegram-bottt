@@ -3,7 +3,7 @@ import sqlite3
 import sys
 from datetime import datetime
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup
-from telegram.ext import Application, CommandHandler, MessageHandler, ContextTypes, filters, CallbackQueryHandler
+from telegram.ext import Application, CommandHandler, MessageHandler, filters, CallbackQueryHandler
 
 # Настройка логирования
 logging.basicConfig(
@@ -99,7 +99,7 @@ def get_admin_reply_keyboard():
     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=False)
 
 # Обработчик команды /start с фото
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def start(update: Update, context):
     user = update.effective_user
     
     welcome_text = (
@@ -137,7 +137,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
 # Обработчик текстовых сообщений для ReplyKeyboardMarkup
-async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def handle_text_message(update: Update, context):
     text = update.message.text
     user = update.effective_user
     
@@ -315,7 +315,7 @@ async def check_user(user_id, username, searcher_id):
         return {"type": "regular", "search_count": 0}
 
 # Обработчик команды /check
-async def check_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def check_command(update: Update, context):
     if context.args:
         username = context.args[0].replace('@', '')
         user_id = hash(username) % 1000000
@@ -399,7 +399,7 @@ async def check_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(response)
 
 # Обработчик команды /me
-async def me_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def me_command(update: Update, context):
     user = update.effective_user
     result = await check_user(user.id, user.username or f"id{user.id}", user.id)
     current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -425,7 +425,7 @@ async def me_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(user_info, reply_markup=get_main_reply_keyboard(user.id))
 
 # Админ команды
-async def add_garant(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def add_garant(update: Update, context):
     if update.effective_user.id != ADMIN_ID:
         await update.message.reply_text("❌ Эта команда только для администратора!")
         return
@@ -444,7 +444,7 @@ async def add_garant(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     await update.message.reply_text(f"✅ Пользователь @{username} добавлен в гаранты")
 
-async def del_garant(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def del_garant(update: Update, context):
     if update.effective_user.id != ADMIN_ID:
         await update.message.reply_text("❌ Эта команда только для администратора!")
         return
@@ -463,7 +463,7 @@ async def del_garant(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         await update.message.reply_text(f"❌ Пользователь @{username} не найден в гарантах")
 
-async def add_scammer(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def add_scammer(update: Update, context):
     if update.effective_user.id != ADMIN_ID:
         await update.message.reply_text("❌ Эта команда только для администратора!")
         return
@@ -487,7 +487,7 @@ async def add_scammer(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     await update.message.reply_text(f"✅ Пользователь @{username} добавлен в скамеры")
 
-async def del_scammer(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def del_scammer(update: Update, context):
     if update.effective_user.id != ADMIN_ID:
         await update.message.reply_text("❌ Эта команда только для администратора!")
         return
@@ -507,7 +507,7 @@ async def del_scammer(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"❌ Пользователь @{username} не найден в скамерах")
 
 # Обработчик инлайн кнопок
-async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def button_callback(update: Update, context):
     query = update.callback_query
     await query.answer()
     
@@ -542,14 +542,17 @@ def main():
         # Обработчик текстовых сообщений
         application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text_message))
         
-        # Обработчик неизвестных команд
-        application.add_handler(MessageHandler(filters.COMMAND, lambda u, c: u.message.reply_text(
-            "❌ Неизвестная команда. Используйте /start для получения списка команд.",
-            reply_markup=get_main_reply_keyboard(u.effective_user.id)
-        )))
+        # Простой обработчик неизвестных команд
+        async def unknown(update, context):
+            await update.message.reply_text(
+                "❌ Неизвестная команда. Используйте /start для получения списка команд.",
+                reply_markup=get_main_reply_keyboard(update.effective_user.id)
+            )
+        
+        application.add_handler(MessageHandler(filters.COMMAND, unknown))
         
         print("🟢 Бот успешно запущен. Ожидание сообщений...")
-        application.run_polling(allowed_updates=Update.ALL_UPDATES, drop_pending_updates=True)
+        application.run_polling()
         
     except Exception as e:
         print(f"🔴 Ошибка при запуске бота: {e}")
